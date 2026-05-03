@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart旅費規程</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome (アイコン用) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel (ブラウザでのJSXコンパイル用) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('generator');
+
+      // 役職別の旅費規程設定（初期値）
+      const [rules, setRules] = useState([
+        { id: 1, role: '社長', dailyAllowance: 10000, lodging: 15000, headcount: 1, avgTripsPerYear: 12 },
+        { id: 2, role: '役員', dailyAllowance: 8000, lodging: 12000, headcount: 2, avgTripsPerYear: 10 },
+        { id: 3, role: '部長', dailyAllowance: 5000, lodging: 10000, headcount: 3, avgTripsPerYear: 5 },
+        { id: 4, role: '一般', dailyAllowance: 3000, lodging: 8000, headcount: 10, avgTripsPerYear: 3 },
+      ]);
+
+      // 出張申請の履歴
+      const [applications, setApplications] = useState([
+        { id: 1, date: '2026-05-01', applicant: '山田 太郎', role: '部長', destination: '大阪', days: 2, status: '承認済' },
+        { id: 2, date: '2026-05-03', applicant: '鈴木 一郎', role: '一般', destination: '福岡', days: 3, status: '申請中' },
+      ]);
+
+      // タブ切り替えコンポーネント
+      const renderContent = () => {
+        switch (activeTab) {
+          case 'dashboard':
+            return <Dashboard rules={rules} />;
+          case 'settings':
+            return <RuleSettings rules={rules} setRules={setRules} />;
+          case 'generator':
+            return <DocumentGenerator rules={rules} />;
+          case 'application':
+            return <ExpenseApplication rules={rules} applications={applications} setApplications={setApplications} />;
+          default:
+            return <Dashboard rules={rules} />;
+        }
+      };
+
+      return (
+        <div className="flex h-screen bg-gray-50">
+          {/* サイドバー */}
+          <div className="w-64 bg-slate-900 text-white flex flex-col">
+            <div className="p-6 flex items-center space-x-3">
+              <i className="fas fa-plane text-3xl text-amber-400"></i>
+              <h1 className="text-xl font-bold tracking-wider">Smart旅費規程</h1>
+            </div>
+            <nav className="flex-1 px-4 space-y-2 mt-4">
+              <NavItem 
+                icon={<i className="fas fa-chart-pie text-lg w-6 text-center"></i>} 
+                label="ダッシュボード" 
+                isActive={activeTab === 'dashboard'} 
+                onClick={() => setActiveTab('dashboard')} 
+              />
+              <NavItem 
+                icon={<i className="fas fa-cog text-lg w-6 text-center"></i>} 
+                label="金額・シミュレーション" 
+                isActive={activeTab === 'settings'} 
+                onClick={() => setActiveTab('settings')} 
+              />
+              <NavItem 
+                icon={<i className="fas fa-magic text-lg w-6 text-center"></i>} 
+                label="規程書ジェネレーター" 
+                isActive={activeTab === 'generator'} 
+                onClick={() => setActiveTab('generator')} 
+              />
+              <NavItem 
+                icon={<i className="fas fa-file-alt text-lg w-6 text-center"></i>} 
+                label="出張申請・精算" 
+                isActive={activeTab === 'application'} 
+                onClick={() => setActiveTab('application')} 
+              />
+            </nav>
+            <div className="p-4 m-4 bg-slate-800 rounded-lg">
+              <p className="text-xs text-slate-400">ログイン中</p>
+              <div className="flex items-center space-x-2 mt-1">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <i className="fas fa-building text-sm"></i>
+                </div>
+                <span className="text-sm font-medium">株式会社サンプル</span>
+              </div>
+            </div>
+          </div>
+
+          {/* メインコンテンツ */}
+          <div className="flex-1 overflow-auto">
+            <header className="bg-white shadow-sm px-8 py-4">
+              <h2 className="text-2xl font-semibold text-gray-800">
+                {activeTab === 'dashboard' && '節税シミュレーション＆サマリー'}
+                {activeTab === 'settings' && '役職別 旅費規程のカスタマイズ'}
+                {activeTab === 'generator' && 'ヒアリング式 旅費規程書ジェネレーター'}
+                {activeTab === 'application' && '出張旅費の申請・精算'}
+              </h2>
+            </header>
+            <main className="p-8">
+              {renderContent()}
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    function NavItem({ icon, label, isActive, onClick }) {
+      return (
+        <button
+          onClick={onClick}
+          className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
+            isActive 
+              ? 'bg-blue-600 text-white shadow-md' 
+              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+          }`}
+        >
+          {icon}
+          <span className="font-medium">{label}</span>
+        </button>
+      );
+    }
+
+    // ==========================================
+    // 旅費規程書ジェネレーター
+    // ==========================================
+    function DocumentGenerator({ rules }) {
+      const [formData, setFormData] = useState({
+        companyName: '株式会社サンプル',
+        effectiveDate: '2026年6月1日',
+        distanceThreshold: '100',
+        timeThreshold: '5',
+        greenCarRole: '役員',
+      });
+
+      const handleChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+      };
+
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
+          
+          {/* 左カラム：ヒアリングフォーム */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sticky top-0">
+              <div className="flex items-center space-x-2 mb-6 pb-4 border-b border-gray-100">
+                <i className="fas fa-magic text-purple-500 text-2xl"></i>
+                <h3 className="text-lg font-bold text-gray-800">かんたんヒアリング</h3>
+              </div>
+
+              <form className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Q1. 会社名を入力してください</label>
+                  <input 
+                    type="text" 
+                    value={formData.companyName}
+                    onChange={e => handleChange('companyName', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Q2. いつからこの規程を施行しますか？</label>
+                  <input 
+                    type="text" 
+                    value={formData.effectiveDate}
+                    onChange={e => handleChange('effectiveDate', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                    placeholder="例: 2026年4月1日"
+                  />
+                </div>
+
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Q3. 「出張」とみなす基準は？</label>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>片道の距離が</span>
+                      <div className="flex items-center">
+                        <input 
+                          type="number" 
+                          value={formData.distanceThreshold}
+                          onChange={e => handleChange('distanceThreshold', e.target.value)}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded-md text-right mx-2 focus:ring-2 focus:ring-purple-500 outline-none"
+                        />
+                        <span>km 以上</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>または、片道の移動時間が</span>
+                      <div className="flex items-center">
+                        <input 
+                          type="number" 
+                          value={formData.timeThreshold}
+                          onChange={e => handleChange('timeThreshold', e.target.value)}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded-md text-right mx-2 focus:ring-2 focus:ring-purple-500 outline-none"
+                        />
+                        <span>時間 以上</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Q4. 新幹線のグリーン車を利用できる役職は？</label>
+                  <select 
+                    value={formData.greenCarRole}
+                    onChange={e => handleChange('greenCarRole', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                  >
+                    {rules.map(r => (
+                      <option key={r.id} value={r.role}>{r.role} 以上</option>
+                    ))}
+                    <option value="利用不可">全員利用不可（普通車のみ）</option>
+                  </select>
+                </div>
+                
+                <div className="pt-4">
+                  <div className="p-3 bg-blue-50 text-blue-800 text-xs rounded-lg flex items-start space-x-2">
+                    <i className="fas fa-file-alt mt-0.5"></i>
+                    <p>日当や宿泊費の金額は、「金額・シミュレーション」タブで設定した内容が自動的に右側の別表に反映されます。</p>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* 右カラム：Word風プレビュー */}
+          <div className="lg:col-span-8 flex flex-col h-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-gray-600 font-medium flex items-center">
+                <i className="fas fa-file-alt mr-2"></i>
+                規程書プレビュー（リアルタイム更新）
+              </h3>
+              <div className="flex space-x-3">
+                <button className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm">
+                  <i className="fas fa-print mr-2 text-gray-600"></i>
+                  印刷
+                </button>
+                <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
+                  <i className="fas fa-download mr-2"></i>
+                  Word形式で出力
+                </button>
+              </div>
+            </div>
+
+            {/* A4用紙風のコンテナ */}
+            <div className="bg-white shadow-md border border-gray-200 rounded-sm p-12 overflow-y-auto" style={{ minHeight: '800px' }}>
+              <div className="max-w-3xl mx-auto font-serif text-gray-800 space-y-6">
+                
+                <h1 className="text-2xl font-bold text-center tracking-widest mb-10 border-b-2 border-gray-800 pb-4">
+                  出張旅費規程
+                </h1>
+
+                <div className="space-y-6 text-sm leading-relaxed">
+                  <section>
+                    <h2 className="font-bold text-lg mb-2">第1条（目的）</h2>
+                    <p>
+                      本規程は、{formData.companyName}（以下「会社」という）の役員及び従業員が、会社の業務の必要により出張する場合における旅費の支給基準等、必要な事項を定めることを目的とする。
+                    </p>
+                  </section>
+
+                  <section>
+                    <h2 className="font-bold text-lg mb-2">第2条（出張の定義）</h2>
+                    <p>
+                      本規程において「出張」とは、通常の勤務地を離れ、次に掲げる基準のいずれかを満たす地域へ業務の目的で赴くことをいう。
+                    </p>
+                    <ul className="list-decimal pl-8 mt-2 space-y-1">
+                      <li>片道の移動距離が {formData.distanceThreshold}km 以上であること</li>
+                      <li>片道の移動時間が {formData.timeThreshold}時間 以上であること</li>
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h2 className="font-bold text-lg mb-2">第3条（旅費の種類）</h2>
+                    <p>
+                      旅費は、交通費、宿泊費及び日当の3種類とし、その支給額は別表「旅費支給基準表」に定めるところによる。ただし、実費が支給額を下回る場合であっても、別表の定額を支給するものとする。
+                    </p>
+                  </section>
+
+                  <section>
+                    <h2 className="font-bold text-lg mb-2">第4条（交通機関の利用基準）</h2>
+                    <p>
+                      出張にあたっては、最も経済的かつ合理的な経路及び交通機関を利用しなければならない。ただし、特別の事情がある場合はこの限りではない。
+                    </p>
+                    <p className="mt-2">
+                      2. 新幹線の利用にあたり、{formData.greenCarRole !== '利用不可' ? `「${formData.greenCarRole}」以上の役職にある者はグリーン車を利用することができる。その他の者は原則として普通車を利用するものとする。` : '全員原則として普通車を利用するものとする。'}
+                    </p>
+                  </section>
+
+                  <section>
+                    <h2 className="font-bold text-lg mb-2">第5条（旅費の精算）</h2>
+                    <p>
+                      出張者は、帰社後速やかに所定の出張報告書兼精算書を提出し、精算を行わなければならない。ただし、宿泊費及び日当については、別表に定める定額を支給するため、宿泊等に係る領収書の添付は原則として不要とする。交通費については、会社が指定する証憑書類（領収書等）を添付すること。
+                    </p>
+                  </section>
+
+                  <div className="mt-12 pt-8 border-t border-gray-300">
+                    <p className="text-right">
+                      <strong>附則</strong><br />
+                      本規程は、{formData.effectiveDate} より施行する。
+                    </p>
+                  </div>
+
+                  {/* 別表：金額設定から自動生成 */}
+                  <div className="mt-16 page-break-before">
+                    <h2 className="font-bold text-lg text-center mb-6">別表：旅費支給基準表</h2>
+                    <table className="w-full border-collapse border border-gray-800">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="border border-gray-800 py-2 px-4 text-center">役職</th>
+                          <th className="border border-gray-800 py-2 px-4 text-center">日当（1日につき）</th>
+                          <th className="border border-gray-800 py-2 px-4 text-center">宿泊費（1泊につき）</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rules.map(rule => (
+                          <tr key={rule.id}>
+                            <td className="border border-gray-800 py-2 px-4 text-center font-medium">{rule.role}</td>
+                            <td className="border border-gray-800 py-2 px-4 text-right">{rule.dailyAllowance.toLocaleString()} 円</td>
+                            <td className="border border-gray-800 py-2 px-4 text-right">{rule.lodging.toLocaleString()} 円</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="text-xs text-gray-500 mt-2">
+                      ※上記金額には消費税等の額を含む。<br/>
+                      ※日当は、出張先での昼食代や雑費等を補填する趣旨で支給するものであり、給与として課税されないものとする。
+                    </p>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // ==========================================
+    // ダッシュボード・設定・申請機能
+    // ==========================================
+    function Dashboard({ rules }) {
+      const simulation = useMemo(() => {
+        let totalTaxFreeAllowance = 0;
+        rules.forEach(rule => {
+          const annualDays = rule.avgTripsPerYear * 2; 
+          totalTaxFreeAllowance += rule.headcount * annualDays * rule.dailyAllowance;
+        });
+
+        const estimatedTaxSaving = totalTaxFreeAllowance * 0.3;
+        const estimatedSocialInsSaving = totalTaxFreeAllowance * 0.3;
+
+        return {
+          allowance: totalTaxFreeAllowance,
+          taxSaving: estimatedTaxSaving,
+          socialInsSaving: estimatedSocialInsSaving,
+          totalBenefit: estimatedTaxSaving + estimatedSocialInsSaving
+        };
+      }, [rules]);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-amber-500 to-orange-400 rounded-2xl p-8 text-white shadow-lg flex items-center justify-between">
+            <div>
+              <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-sm font-bold mb-4">
+                知らないなんてもったいない！
+              </span>
+              <h3 className="text-3xl font-bold mb-2">旅費規程で、手元に資金を残す仕組み</h3>
+              <p className="text-amber-50">設定された規程に基づく現在の年間節税予測シミュレーションです。</p>
+            </div>
+            <div className="hidden md:block">
+              <i className="fas fa-coins text-[8rem] text-white/80 opacity-80"></i>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <KpiCard 
+              title="年間 予測非課税支給額" 
+              amount={`¥${simulation.allowance.toLocaleString()}`} 
+              subtitle="※社長・役員・従業員への手取り額"
+              icon={<i className="fas fa-briefcase text-blue-500 text-xl"></i>}
+              color="blue"
+            />
+            <KpiCard 
+              title="年間 法人税等 削減予測" 
+              amount={`¥${simulation.taxSaving.toLocaleString()}`} 
+              subtitle="※実効税率30%で概算"
+              icon={<i className="fas fa-chart-line text-emerald-500 text-xl"></i>}
+              color="emerald"
+            />
+            <KpiCard 
+              title="年間 社会保険料 削減予測" 
+              amount={`¥${simulation.socialInsSaving.toLocaleString()}`} 
+              subtitle="※労使合計30%で概算"
+              icon={<i className="fas fa-check-circle text-purple-500 text-xl"></i>}
+              color="purple"
+            />
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h4 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">💡 節税のカラクリ</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h5 className="font-semibold text-blue-700 mb-2">1. 会社側のメリット</h5>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  従業員や役員に支払う「出張日当」は、旅費交通費として<strong>全額損金算入</strong>できます。これにより会社の利益が圧縮され、法人税の節税に直結します。実費精算の手間も省け、経理業務の大幅な効率化に繋がります。
+                </p>
+              </div>
+              <div>
+                <h5 className="font-semibold text-orange-600 mb-2">2. 個人（役員・従業員）のメリット</h5>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  受け取った日当は<strong>非課税所得</strong>となるため、所得税や住民税がかかりません。また、給与とはみなされないため、社会保険料の算定基礎にも含まれず、会社・個人双方の社会保険料負担が増えません。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function KpiCard({ title, amount, subtitle, icon, color }) {
+      const bgColors = {
+        blue: 'bg-blue-50',
+        emerald: 'bg-emerald-50',
+        purple: 'bg-purple-50',
+      };
+      return (
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col justify-between">
+          <div className="flex justify-between items-start mb-4">
+            <h4 className="text-gray-500 font-medium text-sm">{title}</h4>
+            <div className={`p-3 rounded-lg ${bgColors[color]}`}>
+              {icon}
+            </div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-gray-800 mb-1">{amount}</div>
+            <p className="text-xs text-gray-400">{subtitle}</p>
+          </div>
+        </div>
+      );
+    }
+
+    function RuleSettings({ rules, setRules }) {
+      const handleChange = (id, field, value) => {
+        const numValue = parseInt(value, 10) || 0;
+        setRules(rules.map(rule => 
+          rule.id === id ? { ...rule, [field]: numValue } : rule
+        ));
+      };
+
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-bold text-gray-800">役職別 支給額・シミュレーション設定</h3>
+              <p className="text-sm text-gray-500 mt-1">※税務調査で否認されないよう、社会通念上妥当な金額を設定してください。</p>
+            </div>
+            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              設定を保存する
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 text-gray-600 text-sm border-b">
+                  <th className="p-4 font-semibold">役職</th>
+                  <th className="p-4 font-semibold">日当（1日あたり）</th>
+                  <th className="p-4 font-semibold">宿泊費（1泊上限）</th>
+                  <th className="p-4 font-semibold text-gray-400 text-xs">シミュレーション用: 対象人数</th>
+                  <th className="p-4 font-semibold text-gray-400 text-xs">シミュレーション用: 年間出張数</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {rules.map((rule) => (
+                  <tr key={rule.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="p-4 font-medium text-gray-800">
+                      <div className="flex items-center space-x-2">
+                        <i className="fas fa-user text-gray-400"></i>
+                        <span>{rule.role}</span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
+                        <input 
+                          type="number" 
+                          value={rule.dailyAllowance}
+                          onChange={(e) => handleChange(rule.id, 'dailyAllowance', e.target.value)}
+                          className="w-32 pl-8 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                        />
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
+                        <input 
+                          type="number" 
+                          value={rule.lodging}
+                          onChange={(e) => handleChange(rule.id, 'lodging', e.target.value)}
+                          className="w-32 pl-8 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                        />
+                      </div>
+                    </td>
+                    <td className="p-4">
+                       <input 
+                          type="number" 
+                          value={rule.headcount}
+                          onChange={(e) => handleChange(rule.id, 'headcount', e.target.value)}
+                          className="w-20 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-500 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                        /> 人
+                    </td>
+                    <td className="p-4">
+                      <input 
+                          type="number" 
+                          value={rule.avgTripsPerYear}
+                          onChange={(e) => handleChange(rule.id, 'avgTripsPerYear', e.target.value)}
+                          className="w-20 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-500 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                        /> 回
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    function ExpenseApplication({ rules, applications, setApplications }) {
+      const [formData, setFormData] = useState({
+        applicant: '',
+        role: rules[0].role,
+        destination: '',
+        days: 1,
+        transportationCost: 0
+      });
+
+      const currentRule = rules.find(r => r.role === formData.role) || rules[0];
+      const calculatedDaily = currentRule.dailyAllowance * formData.days;
+      const calculatedLodging = currentRule.lodging * (formData.days > 1 ? formData.days - 1 : 0);
+      const totalAmount = calculatedDaily + calculatedLodging + (parseInt(formData.transportationCost) || 0);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!formData.applicant || !formData.destination) {
+          alert("氏名と出張先を入力してください。");
+          return;
+        }
+
+        const newApp = {
+          id: Date.now(),
+          date: new Date().toISOString().split('T')[0],
+          applicant: formData.applicant,
+          role: formData.role,
+          destination: formData.destination,
+          days: formData.days,
+          status: '申請中'
+        };
+
+        setApplications([newApp, ...applications]);
+        setFormData({ ...formData, applicant: '', destination: '', days: 1, transportationCost: 0 });
+      };
+
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center">
+                <i className="fas fa-plane mr-2 text-blue-500 text-xl"></i>
+                新規出張申請
+              </h3>
+              
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">氏名</label>
+                    <input 
+                      type="text" 
+                      value={formData.applicant}
+                      onChange={e => setFormData({...formData, applicant: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">役職</label>
+                    <select 
+                      value={formData.role}
+                      onChange={e => setFormData({...formData, role: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      {rules.map(r => (
+                        <option key={r.id} value={r.role}>{r.role}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                      <i className="fas fa-map-marker-alt mr-1 text-gray-400"></i> 目的地
+                    </label>
+                    <input 
+                      type="text" 
+                      value={formData.destination}
+                      onChange={e => setFormData({...formData, destination: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                      <i className="fas fa-calendar-alt mr-1 text-gray-400"></i> 出張日数
+                    </label>
+                    <div className="flex items-center">
+                      <input 
+                        type="number" 
+                        min="1"
+                        value={formData.days}
+                        onChange={e => setFormData({...formData, days: parseInt(e.target.value) || 1})}
+                        className="w-24 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                      <span className="ml-2 text-gray-600">日間 （宿泊: {formData.days > 1 ? formData.days - 1 : 0}泊）</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">実費交通費（航空券・新幹線など）</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
+                    <input 
+                      type="number" 
+                      value={formData.transportationCost}
+                      onChange={e => setFormData({...formData, transportationCost: e.target.value})}
+                      className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-gray-100 flex justify-end">
+                  <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium shadow-sm">
+                    この内容で申請する
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">最近の申請履歴</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-xs text-gray-500 border-b border-gray-100">
+                      <th className="pb-2 font-medium">申請日</th>
+                      <th className="pb-2 font-medium">申請者</th>
+                      <th className="pb-2 font-medium">目的地</th>
+                      <th className="pb-2 font-medium">日数</th>
+                      <th className="pb-2 font-medium">ステータス</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {applications.map(app => (
+                      <tr key={app.id} className="text-sm text-gray-700">
+                        <td className="py-3">{app.date}</td>
+                        <td className="py-3 font-medium">{app.applicant} <span className="text-xs text-gray-400 ml-1">({app.role})</span></td>
+                        <td className="py-3">{app.destination}</td>
+                        <td className="py-3">{app.days}日</td>
+                        <td className="py-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            app.status === '承認済' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {app.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-slate-800 rounded-xl shadow-lg p-6 text-white sticky top-6">
+              <h3 className="text-lg font-bold mb-4 flex items-center border-b border-slate-700 pb-3">
+                <i className="fas fa-calculator mr-2 text-blue-400"></i>
+                自動計算結果プレビュー
+              </h3>
+              
+              <div className="space-y-4 text-sm">
+                <div className="flex justify-between items-center text-slate-300">
+                  <span>適用規程</span>
+                  <span className="font-bold text-white bg-slate-700 px-2 py-1 rounded">{formData.role}規程</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">日当</span>
+                  <span className="font-bold text-blue-300">¥{calculatedDaily.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">宿泊費</span>
+                  <span className="font-bold text-blue-300">¥{calculatedLodging.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-300">実費交通費</span>
+                  <span>¥{(parseInt(formData.transportationCost) || 0).toLocaleString()}</span>
+                </div>
+                <div className="pt-4 mt-4 border-t border-slate-700">
+                  <div className="flex justify-between items-end">
+                    <span className="font-medium">支給合計額</span>
+                    <span className="text-3xl font-bold text-amber-400">¥{totalAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
